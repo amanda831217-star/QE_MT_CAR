@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>工程資源管理系統</title>
+  <title>工程資源管理平台</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="app">
     <header class="topbar">
       <div class="brand-wrap">
-        <div class="brand-title">工程資源管理系統</div>
-        <div class="brand-sub">機具・材料・車輛調度</div>
+        <div class="brand-title">工程資源管理平台</div>
+        <div class="brand-sub">機具／材料／車輛調度</div>
       </div>
       <button id="refreshBtn" class="icon-btn" type="button" aria-label="重新整理">↻</button>
     </header>
@@ -20,10 +20,10 @@
       <section id="homeView" class="view active">
         <div class="hero">
           <div class="hero-left">
-            <div class="hero-title" id="userName">使用者</div>
+            <div class="hero-title">首頁總覽</div>
             <div class="hero-sub" id="todayText"></div>
           </div>
-          <div class="hero-badge">● 線上</div>
+          <div class="hero-badge">● 系統正常</div>
         </div>
 
         <div class="dashboard-grid">
@@ -33,14 +33,8 @@
               <span class="status-dot green"></span>
             </div>
             <div class="card-metrics">
-              <div>
-                <strong id="eqAvailable">0</strong>
-                <span>可借用</span>
-              </div>
-              <div>
-                <strong id="eqBorrowed">0</strong>
-                <span>借出中</span>
-              </div>
+              <div><strong id="eqAvailable">0</strong><span>可借用</span></div>
+              <div><strong id="eqBorrowed">0</strong><span>借出中</span></div>
             </div>
             <div class="card-link">進入功能</div>
           </button>
@@ -51,14 +45,8 @@
               <span class="status-dot amber"></span>
             </div>
             <div class="card-metrics">
-              <div>
-                <strong id="matLow">0</strong>
-                <span>低庫存</span>
-              </div>
-              <div>
-                <strong id="matState">-</strong>
-                <span>狀態</span>
-              </div>
+              <div><strong id="matLow">0</strong><span>低庫存</span></div>
+              <div><strong id="matOut">0</strong><span>缺料</span></div>
             </div>
             <div class="card-link">進入功能</div>
           </button>
@@ -69,30 +57,26 @@
               <span class="status-dot blue"></span>
             </div>
             <div class="card-metrics">
-              <div>
-                <strong id="vhAvailable">0</strong>
-                <span>可使用</span>
-              </div>
-              <div>
-                <strong id="vhReserved">0</strong>
-                <span>使用中</span>
-              </div>
+              <div><strong id="vhAvailable">0</strong><span>可用車輛</span></div>
+              <div><strong id="vhReserved">0</strong><span>今日預約</span></div>
             </div>
             <div class="card-link">進入功能</div>
           </button>
         </div>
 
         <section class="section-card">
-          <div class="section-header">
-            <div class="section-title">📋 我的使用中項目</div>
+          <div class="section-title">📌 使用說明</div>
+          <div class="notice-list">
+            <div class="notice-item">機具借用需填寫借用人與預計歸還日。</div>
+            <div class="notice-item">材料依數量與安全庫存自動判斷正常、低庫存、缺料。</div>
+            <div class="notice-item">車輛預約若時段重疊，系統會自動阻擋。</div>
           </div>
-          <div id="myActiveList" class="list-stack"></div>
         </section>
       </section>
 
       <section id="equipmentView" class="view">
         <div class="tools">
-          <input id="equipmentSearch" class="input" placeholder="搜尋機具名稱 / 編號 / 儲位">
+          <input id="equipmentSearch" class="input" placeholder="搜尋機具名稱／編號／儲位">
           <div class="chip-row">
             <button class="chip active" data-eq-status="" type="button">全部</button>
             <button class="chip" data-eq-status="available" type="button">可借用</button>
@@ -104,7 +88,7 @@
 
       <section id="materialsView" class="view">
         <div class="tools">
-          <input id="materialSearch" class="input" placeholder="搜尋材料名稱 / 類別 / 儲位">
+          <input id="materialSearch" class="input" placeholder="搜尋材料名稱／類別／儲位">
         </div>
         <div id="materialList" class="list-stack"></div>
       </section>
@@ -112,26 +96,84 @@
       <section id="vehiclesView" class="view">
         <div class="tools">
           <input id="vehicleDate" class="input" type="date">
-          <input id="vehicleSearch" class="input" placeholder="搜尋車輛名稱 / 車牌 / 車種">
+          <input id="vehicleSearch" class="input" placeholder="搜尋車輛名稱／車牌／車種">
         </div>
         <div id="vehicleList" class="list-stack"></div>
       </section>
 
-      <section id="myView" class="view">
-        <section class="section-card">
-          <div class="section-title">🔧 我的機具</div>
-          <div id="myEquipment" class="list-stack compact"></div>
-        </section>
+      <section id="adminView" class="view">
+        <div class="tools">
+          <div class="chip-row">
+            <button class="chip active" data-admin-tab="vehicles" type="button">車輛新增</button>
+            <button class="chip" data-admin-tab="vehicleLogs" type="button">車輛紀錄</button>
+            <button class="chip" data-admin-tab="equipmentLogs" type="button">機具紀錄</button>
+            <button class="chip" data-admin-tab="materialLogs" type="button">材料紀錄</button>
+            <button class="chip" data-admin-tab="materialStock" type="button">材料調整</button>
+          </div>
+        </div>
 
-        <section class="section-card">
-          <div class="section-title">📦 我的材料紀錄</div>
-          <div id="myMaterials" class="list-stack compact"></div>
-        </section>
+        <div id="adminVehiclesTab" class="admin-tab active">
+          <section class="section-card">
+            <div class="section-title">➕ 新增車輛</div>
+            <div class="form-grid">
+              <div class="field">
+                <div class="label">車輛名稱</div>
+                <input id="addVehicleName" class="input">
+              </div>
+              <div class="field">
+                <div class="label">車牌</div>
+                <input id="addVehiclePlate" class="input">
+              </div>
+              <div class="field">
+                <div class="label">車種</div>
+                <input id="addVehicleType" class="input" placeholder="例如：公務車 / 高空車 / 貨車">
+              </div>
+              <div class="field">
+                <div class="label">停放位置</div>
+                <input id="addVehicleLocation" class="input">
+              </div>
+              <div class="field">
+                <div class="label">備註</div>
+                <textarea id="addVehicleNote" class="textarea"></textarea>
+              </div>
+            </div>
+            <div class="action-row">
+              <button id="addVehicleBtn" class="btn btn-primary" type="button">新增車輛</button>
+            </div>
+          </section>
+        </div>
 
-        <section class="section-card">
-          <div class="section-title">🚗 我的車輛紀錄</div>
-          <div id="myVehicles" class="list-stack compact"></div>
-        </section>
+        <div id="adminVehicleLogsTab" class="admin-tab">
+          <section class="section-card">
+            <div class="section-title">🚗 車輛調度紀錄</div>
+            <input id="adminVehicleLogSearch" class="input" placeholder="搜尋申請人／駕駛人／車牌／用途">
+            <div id="adminVehicleLogs" class="list-stack"></div>
+          </section>
+        </div>
+
+        <div id="adminEquipmentLogsTab" class="admin-tab">
+          <section class="section-card">
+            <div class="section-title">🔧 機具借還紀錄</div>
+            <input id="adminEquipmentLogSearch" class="input" placeholder="搜尋申請人／機具名稱／資產編號">
+            <div id="adminEquipmentLogs" class="list-stack"></div>
+          </section>
+        </div>
+
+        <div id="adminMaterialLogsTab" class="admin-tab">
+          <section class="section-card">
+            <div class="section-title">📦 材料領用紀錄</div>
+            <input id="adminMaterialLogSearch" class="input" placeholder="搜尋申請人／材料名稱／用途">
+            <div id="adminMaterialLogs" class="list-stack"></div>
+          </section>
+        </div>
+
+        <div id="adminMaterialStockTab" class="admin-tab">
+          <section class="section-card">
+            <div class="section-title">🛠 材料庫存調整</div>
+            <input id="adminMaterialStockSearch" class="input" placeholder="搜尋材料名稱">
+            <div id="adminMaterialStockList" class="list-stack"></div>
+          </section>
+        </div>
       </section>
     </main>
 
@@ -140,7 +182,7 @@
       <button class="nav-btn" data-nav="equipment" type="button">機具</button>
       <button class="nav-btn" data-nav="materials" type="button">材料</button>
       <button class="nav-btn" data-nav="vehicles" type="button">車輛</button>
-      <button class="nav-btn" data-nav="my" type="button">我的</button>
+      <button class="nav-btn" data-nav="admin" type="button">後台</button>
     </nav>
   </div>
 
