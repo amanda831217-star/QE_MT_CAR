@@ -221,6 +221,7 @@ button{border:0;background:none}
 .badge.active{background:var(--blue-soft);color:#1d4ed8}
 .badge.done{background:var(--green-soft);color:#166534}
 .badge.cancel{background:var(--red-soft);color:#991b1b}
+.badge.none{background:#e5e7eb;color:#475569}
 
 .action-row{
   display:flex;
