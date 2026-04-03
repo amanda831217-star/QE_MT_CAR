@@ -818,6 +818,7 @@ function debounce(fn, delay = 250) {
 }
 
 function materialStatusText(status) {
+  if (status === 'none') return '不控管';
   if (status === 'low') return '低庫存';
   if (status === 'out') return '缺料';
   return '正常';
