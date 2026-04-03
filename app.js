@@ -1,5 +1,5 @@
 const CONFIG = {
-  apiUrl: 'https://script.google.com/macros/library/d/1fGFTMbao5va8kVz_rw5gyKNGAxo4faUUPH1M1G8Y9f3HPv8DT-uNqwKC/2',
+  apiUrl: 'https://script.google.com/macros/s/AKfycbwarTXauF6qF4Q27XaRzlRF71amQ55VKAO49WHaqhoTuzr3NX-pYTPPu47JyiACHhUr/exec',
   userId: 'U001'
 };
 
