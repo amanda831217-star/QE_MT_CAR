@@ -1,5 +1,5 @@
 const CONFIG = {
-  apiUrl: 'https://script.google.com/macros/s/AKfycbwarTXauF6qF4Q27XaRzlRF71amQ55VKAO49WHaqhoTuzr3NX-pYTPPu47JyiACHhUr/exec',
+  apiUrl: 'https://script.google.com/macros/library/d/1fGFTMbao5va8kVz_rw5gyKNGAxo4faUUPH1M1G8Y9f3HPv8DT-uNqwKC/2',
   userId: 'U001'
 };
 
@@ -58,7 +58,7 @@ function bindEvents() {
 
 function setToday() {
   const now = new Date();
-  $('#todayText').textContent = now.toLocaleDateString(undefined, {
+  $('#todayText').textContent = now.toLocaleDateString('zh-TW', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -94,7 +94,7 @@ function showView(name) {
 
 async function api(action, payload = {}) {
   if (!CONFIG.apiUrl || CONFIG.apiUrl.includes('PASTE_YOUR_GAS_WEB_APP_URL_HERE')) {
-    throw new Error('Missing apiUrl');
+    throw new Error('尚未設定 API 網址');
   }
 
   const res = await fetch(CONFIG.apiUrl, {
@@ -109,8 +109,27 @@ async function api(action, payload = {}) {
     })
   });
 
-  const json = await res.json();
-  if (!json.ok) throw new Error(json.message || 'Request failed');
+  const raw = await res.text();
+
+  if (!raw) {
+    throw new Error('API 無回應');
+  }
+
+  if (raw.trim().startsWith('<')) {
+    throw new Error('API 回傳 HTML，請確認 GAS 部署網址為 /exec，且權限為 Anyone');
+  }
+
+  let json;
+  try {
+    json = JSON.parse(raw);
+  } catch (err) {
+    throw new Error('API 回傳格式錯誤，非 JSON');
+  }
+
+  if (!json.ok) {
+    throw new Error(json.message || '系統處理失敗');
+  }
+
   return json.data;
 }
 
@@ -123,7 +142,7 @@ async function loadHome() {
     $('#eqAvailable').textContent = data.summary.equipmentAvailable;
     $('#eqBorrowed').textContent = data.summary.equipmentBorrowed;
     $('#matLow').textContent = data.summary.materialsLow;
-    $('#matState').textContent = data.summary.materialsLow > 0 ? 'Check' : 'Good';
+    $('#matState').textContent = data.summary.materialsLow > 0 ? '注意' : '正常';
     $('#vhAvailable').textContent = data.summary.vehiclesAvailable;
     $('#vhReserved').textContent = data.summary.vehiclesReserved;
 
@@ -175,7 +194,7 @@ function renderHomeMy(my) {
     items.push(`
       <div class="mini-card">
         ${escapeHtml(x.name)}
-        <div class="small">${escapeHtml(x.returnDate || '')}</div>
+        <div class="small">預計歸還：${escapeHtml(x.returnDate || '')}</div>
       </div>
     `);
   });
@@ -189,14 +208,14 @@ function renderHomeMy(my) {
     `);
   });
 
-  holder.innerHTML = items.length ? items.join('') : `<div class="empty">No active items</div>`;
+  holder.innerHTML = items.length ? items.join('') : `<div class="empty">目前沒有使用中項目</div>`;
 }
 
 function renderEquipment() {
   const holder = $('#equipmentList');
 
   if (!state.equipment.length) {
-    holder.innerHTML = `<div class="empty">No data</div>`;
+    holder.innerHTML = `<div class="empty">查無資料</div>`;
     return;
   }
 
@@ -207,15 +226,15 @@ function renderEquipment() {
           <div class="item-title">${escapeHtml(item.name)}</div>
           <div class="item-sub">${escapeHtml(item.id)} · ${escapeHtml(item.location || '-')}</div>
         </div>
-        <span class="badge ${item.status}">${escapeHtml(item.status)}</span>
+        <span class="badge ${item.status}">${item.status === 'available' ? '可借用' : '借出中'}</span>
       </div>
       ${item.spec ? `<div class="item-sub">${escapeHtml(item.spec)}</div>` : ''}
-      ${item.borrower ? `<div class="item-sub">Borrower: ${escapeHtml(item.borrower)}</div>` : ''}
-      ${item.returnDate ? `<div class="item-sub">Return: ${escapeHtml(item.returnDate)}</div>` : ''}
+      ${item.borrower ? `<div class="item-sub">借用人：${escapeHtml(item.borrower)}</div>` : ''}
+      ${item.returnDate ? `<div class="item-sub">預計歸還：${escapeHtml(item.returnDate)}</div>` : ''}
       <div class="action-row">
         ${item.status === 'available'
-          ? `<button class="btn btn-primary" type="button" onclick='openBorrowEquipment(${jsonAttr(item)})'>Borrow</button>`
-          : `<button class="btn btn-danger" type="button" onclick='openReturnEquipment(${jsonAttr(item)})'>Return</button>`}
+          ? `<button class="btn btn-primary" type="button" onclick='openBorrowEquipment(${jsonAttr(item)})'>借用</button>`
+          : `<button class="btn btn-danger" type="button" onclick='openReturnEquipment(${jsonAttr(item)})'>歸還</button>`}
       </div>
     </section>
   `).join('');
@@ -225,7 +244,7 @@ function renderMaterials() {
   const holder = $('#materialList');
 
   if (!state.materials.length) {
-    holder.innerHTML = `<div class="empty">No data</div>`;
+    holder.innerHTML = `<div class="empty">查無資料</div>`;
     return;
   }
 
@@ -236,12 +255,12 @@ function renderMaterials() {
           <div class="item-title">${escapeHtml(item.name)}</div>
           <div class="item-sub">${escapeHtml(item.category || '-')} · ${escapeHtml(item.location || '-')}</div>
         </div>
-        <span class="badge ${item.status}">${escapeHtml(item.status)}</span>
+        <span class="badge ${item.status}">${materialStatusText(item.status)}</span>
       </div>
       ${item.spec ? `<div class="item-sub">${escapeHtml(item.spec)}</div>` : ''}
-      <div class="item-sub">Stock: ${escapeHtml(String(item.qty))} ${escapeHtml(item.unit)}</div>
+      <div class="item-sub">庫存：${escapeHtml(String(item.qty))} ${escapeHtml(item.unit)}</div>
       <div class="action-row">
-        <button class="btn btn-primary" type="button" onclick='openIssueMaterial(${jsonAttr(item)})' ${item.qty <= 0 ? 'disabled' : ''}>Issue</button>
+        <button class="btn btn-primary" type="button" onclick='openIssueMaterial(${jsonAttr(item)})' ${item.qty <= 0 ? 'disabled' : ''}>領用</button>
       </div>
     </section>
   `).join('');
@@ -251,7 +270,7 @@ function renderVehicles() {
   const holder = $('#vehicleList');
 
   if (!state.vehicles.length) {
-    holder.innerHTML = `<div class="empty">No data</div>`;
+    holder.innerHTML = `<div class="empty">查無資料</div>`;
     return;
   }
 
@@ -262,7 +281,7 @@ function renderVehicles() {
           <div class="item-title">${escapeHtml(item.name)}</div>
           <div class="item-sub">${escapeHtml(item.plateNo)} · ${escapeHtml(item.type)}</div>
         </div>
-        <span class="badge ${item.reservations.length ? 'partial' : 'available'}">${item.reservations.length ? 'reserved' : 'available'}</span>
+        <span class="badge ${item.reservations.length ? 'partial' : 'available'}">${item.reservations.length ? '已預約' : '可使用'}</span>
       </div>
       <div class="list-stack compact">
         ${item.reservations.length
@@ -272,10 +291,10 @@ function renderVehicles() {
                 <div class="small">${escapeHtml(r.destination)}</div>
               </div>
             `).join('')
-          : `<div class="mini-card">No reservations</div>`}
+          : `<div class="mini-card">目前無預約</div>`}
       </div>
       <div class="action-row">
-        <button class="btn btn-primary" type="button" onclick='openReserveVehicle(${jsonAttr(item)})'>Reserve</button>
+        <button class="btn btn-primary" type="button" onclick='openReserveVehicle(${jsonAttr(item)})'>預約</button>
       </div>
     </section>
   `).join('');
@@ -285,7 +304,7 @@ function renderMy(my) {
   $('#myEquipment').innerHTML = listOrEmpty((my.equipment || []).map(x => `
     <div class="mini-card">
       ${escapeHtml(x.name)}
-      <div class="small">${escapeHtml(x.returnDate || '')}</div>
+      <div class="small">預計歸還：${escapeHtml(x.returnDate || '')}</div>
     </div>
   `));
 
@@ -305,21 +324,21 @@ function renderMy(my) {
 }
 
 function listOrEmpty(items) {
-  return items.length ? items.join('') : `<div class="empty">No data</div>`;
+  return items.length ? items.join('') : `<div class="empty">查無資料</div>`;
 }
 
 function openBorrowEquipment(item) {
-  openModal(`Borrow · ${item.name}`, `
+  openModal(`借用 · ${item.name}`, `
     <div class="field">
-      <div class="label">Return date</div>
+      <div class="label">預計歸還日</div>
       <input id="eqReturnDate" class="input" type="date">
     </div>
     <div class="field">
-      <div class="label">Note</div>
+      <div class="label">備註</div>
       <textarea id="eqNote" class="textarea"></textarea>
     </div>
     <div class="action-row">
-      <button class="btn btn-primary" type="button" id="eqBorrowConfirm">Confirm</button>
+      <button class="btn btn-primary" type="button" id="eqBorrowConfirm">確認借用</button>
     </div>
   `);
 
@@ -332,7 +351,7 @@ function openBorrowEquipment(item) {
         returnDate: $('#eqReturnDate').value,
         note: $('#eqNote').value.trim()
       });
-      toast('Success');
+      toast('操作成功');
       closeModal();
       await loadEquipment();
       await loadHome();
@@ -341,13 +360,13 @@ function openBorrowEquipment(item) {
 }
 
 function openReturnEquipment(item) {
-  openModal(`Return · ${item.name}`, `
+  openModal(`歸還 · ${item.name}`, `
     <div class="field">
-      <div class="label">Note</div>
+      <div class="label">備註</div>
       <textarea id="eqReturnNote" class="textarea"></textarea>
     </div>
     <div class="action-row">
-      <button class="btn btn-danger" type="button" id="eqReturnConfirm">Confirm</button>
+      <button class="btn btn-danger" type="button" id="eqReturnConfirm">確認歸還</button>
     </div>
   `);
 
@@ -357,7 +376,7 @@ function openReturnEquipment(item) {
         rowNumber: item.rowNumber,
         note: $('#eqReturnNote').value.trim()
       });
-      toast('Success');
+      toast('操作成功');
       closeModal();
       await loadEquipment();
       await loadHome();
@@ -366,21 +385,21 @@ function openReturnEquipment(item) {
 }
 
 function openIssueMaterial(item) {
-  openModal(`Issue · ${item.name}`, `
+  openModal(`領用 · ${item.name}`, `
     <div class="field">
-      <div class="label">Quantity</div>
+      <div class="label">數量</div>
       <input id="matQty" class="input" type="number" min="1" step="1" value="1">
     </div>
     <div class="field">
-      <div class="label">Purpose</div>
+      <div class="label">用途</div>
       <input id="matPurpose" class="input">
     </div>
     <div class="field">
-      <div class="label">Note</div>
+      <div class="label">備註</div>
       <textarea id="matNote" class="textarea"></textarea>
     </div>
     <div class="action-row">
-      <button class="btn btn-primary" type="button" id="matIssueConfirm">Confirm</button>
+      <button class="btn btn-primary" type="button" id="matIssueConfirm">確認領用</button>
     </div>
   `);
 
@@ -392,7 +411,7 @@ function openIssueMaterial(item) {
         purpose: $('#matPurpose').value.trim(),
         note: $('#matNote').value.trim()
       });
-      toast('Success');
+      toast('操作成功');
       closeModal();
       await loadMaterials();
       await loadHome();
@@ -404,37 +423,37 @@ function openIssueMaterial(item) {
 function openReserveVehicle(item) {
   const date = $('#vehicleDate').value || new Date().toISOString().slice(0, 10);
 
-  openModal(`Reserve · ${item.name}`, `
+  openModal(`預約 · ${item.name}`, `
     <div class="field">
-      <div class="label">Driver</div>
+      <div class="label">駕駛人</div>
       <input id="vhDriver" class="input">
     </div>
     <div class="field">
-      <div class="label">Purpose</div>
+      <div class="label">用途</div>
       <select id="vhPurpose" class="select">
-        <option value="Site Visit">Site Visit</option>
-        <option value="Material Delivery">Material Delivery</option>
-        <option value="Meeting">Meeting</option>
+        <option value="現場巡檢">現場巡檢</option>
+        <option value="材料運送">材料運送</option>
+        <option value="會勘會議">會勘會議</option>
       </select>
     </div>
     <div class="field">
-      <div class="label">Destination</div>
+      <div class="label">目的地</div>
       <input id="vhDestination" class="input">
     </div>
     <div class="field">
-      <div class="label">Start</div>
+      <div class="label">開始時間</div>
       <input id="vhStart" class="input" type="datetime-local" value="${date}T08:00">
     </div>
     <div class="field">
-      <div class="label">End</div>
+      <div class="label">結束時間</div>
       <input id="vhEnd" class="input" type="datetime-local" value="${date}T12:00">
     </div>
     <div class="field">
-      <div class="label">Note</div>
+      <div class="label">備註</div>
       <textarea id="vhNote" class="textarea"></textarea>
     </div>
     <div class="action-row">
-      <button class="btn btn-primary" type="button" id="vhReserveConfirm">Confirm</button>
+      <button class="btn btn-primary" type="button" id="vhReserveConfirm">確認預約</button>
     </div>
   `);
 
@@ -449,7 +468,7 @@ function openReserveVehicle(item) {
         endAt: $('#vhEnd').value,
         note: $('#vhNote').value.trim()
       });
-      toast('Success');
+      toast('操作成功');
       closeModal();
       await loadVehicles();
       await loadHome();
@@ -470,14 +489,15 @@ function closeModal() {
 }
 
 async function submitButton(btn, fn) {
-  const text = btn.textContent;
+  const originalText = btn.textContent;
   btn.disabled = true;
-  btn.textContent = 'Processing';
+  btn.textContent = '處理中...';
+
   try {
     await withLoading(fn);
   } finally {
     btn.disabled = false;
-    btn.textContent = text;
+    btn.textContent = originalText;
   }
 }
 
@@ -486,7 +506,7 @@ async function withLoading(fn) {
     $('#loading').classList.remove('hidden');
     await fn();
   } catch (err) {
-    toast(err.message || 'Error');
+    toast(err.message || '系統錯誤');
     throw err;
   } finally {
     $('#loading').classList.add('hidden');
@@ -498,7 +518,9 @@ function toast(message) {
   el.textContent = message;
   el.classList.remove('hidden');
   clearTimeout(toast._timer);
-  toast._timer = setTimeout(() => el.classList.add('hidden'), 2200);
+  toast._timer = setTimeout(() => {
+    el.classList.add('hidden');
+  }, 2600);
 }
 
 function debounce(fn, delay = 250) {
@@ -507,6 +529,12 @@ function debounce(fn, delay = 250) {
     clearTimeout(timer);
     timer = setTimeout(() => fn(...args), delay);
   };
+}
+
+function materialStatusText(status) {
+  if (status === 'low') return '低庫存';
+  if (status === 'out') return '缺料';
+  return '正常';
 }
 
 function escapeHtml(v) {
