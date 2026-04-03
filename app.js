@@ -67,7 +67,6 @@ function bindEvents() {
       toast('新增車輛成功');
       clearAddVehicleForm();
       await loadVehicles();
-      await loadAdminTab('vehicles');
       await loadHome();
     });
   });
@@ -141,7 +140,6 @@ async function api(action, payload = {}) {
   const raw = await res.text();
 
   if (!raw) throw new Error('API 無回應');
-
   if (raw.trim().startsWith('<')) {
     throw new Error('API 回傳 HTML，請確認 GAS 已部署為 /exec，且權限為 Anyone');
   }
@@ -163,7 +161,6 @@ async function api(action, payload = {}) {
 async function loadHome() {
   await withLoading(async () => {
     const data = await api('getDashboard');
-
     $('#eqAvailable').textContent = data.summary.equipmentAvailable ?? 0;
     $('#eqBorrowed').textContent = data.summary.equipmentBorrowed ?? 0;
     $('#matLow').textContent = data.summary.materialsLow ?? 0;
@@ -250,6 +247,30 @@ async function loadAdminTab(tab) {
   }
 }
 
+function sortByLocationThenName(items, nameKey = 'name') {
+  return [...items].sort((a, b) => {
+    const la = (a.location || '').localeCompare(b.location || '', 'zh-Hant');
+    if (la !== 0) return la;
+    return (a[nameKey] || '').localeCompare(b[nameKey] || '', 'zh-Hant');
+  });
+}
+
+function groupByLocation(items) {
+  const groups = {};
+  items.forEach(item => {
+    const key = item.location || '未設定儲位';
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(item);
+  });
+
+  return Object.keys(groups)
+    .sort((a, b) => a.localeCompare(b, 'zh-Hant'))
+    .map(location => ({
+      location,
+      items: sortByLocationThenName(groups[location])
+    }));
+}
+
 function renderEquipment() {
   const holder = $('#equipmentList');
 
@@ -258,22 +279,32 @@ function renderEquipment() {
     return;
   }
 
-  holder.innerHTML = state.equipment.map(item => `
-    <section class="item-card">
-      <div class="item-top">
-        <div>
-          <div class="item-title">${escapeHtml(item.name)}</div>
-          <div class="item-sub">${escapeHtml(item.id)} · ${escapeHtml(item.location || '-')}</div>
-        </div>
-        <span class="badge ${item.status}">${item.status === 'available' ? '可借用' : '借出中'}</span>
-      </div>
-      ${item.spec ? `<div class="item-sub">${escapeHtml(item.spec)}</div>` : ''}
-      ${item.borrower ? `<div class="item-sub">借用人：${escapeHtml(item.borrower)}</div>` : ''}
-      ${item.returnDate ? `<div class="item-sub">預計歸還：${escapeHtml(item.returnDate)}</div>` : ''}
-      <div class="action-row">
-        ${item.status === 'available'
-          ? `<button class="btn btn-primary" type="button" onclick='openBorrowEquipment(${jsonAttr(item)})'>借用</button>`
-          : `<button class="btn btn-danger" type="button" onclick='openReturnEquipment(${jsonAttr(item)})'>歸還</button>`}
+  const groups = groupByLocation(state.equipment);
+
+  holder.innerHTML = groups.map(group => `
+    <section class="section-card">
+      <div class="section-title">📍 儲位：${escapeHtml(group.location)}</div>
+      <div class="list-stack">
+        ${group.items.map(item => `
+          <section class="item-card">
+            <div class="item-top">
+              <div>
+                <div class="item-title">${escapeHtml(item.name)}</div>
+                <div class="item-sub">資產編號：${escapeHtml(item.id)}</div>
+                <div class="location-chip">儲位：${escapeHtml(item.location || '-')}</div>
+              </div>
+              <span class="badge ${item.status}">${item.status === 'available' ? '可借用' : '借出中'}</span>
+            </div>
+            ${item.spec ? `<div class="item-sub">規格：${escapeHtml(item.spec)}</div>` : ''}
+            ${item.borrower ? `<div class="item-sub">借用人：${escapeHtml(item.borrower)}</div>` : ''}
+            ${item.returnDate ? `<div class="item-sub">預計歸還：${escapeHtml(item.returnDate)}</div>` : ''}
+            <div class="action-row">
+              ${item.status === 'available'
+                ? `<button class="btn btn-primary" type="button" onclick='openBorrowEquipment(${jsonAttr(item)})'>借用</button>`
+                : `<button class="btn btn-danger" type="button" onclick='openReturnEquipment(${jsonAttr(item)})'>歸還</button>`}
+            </div>
+          </section>
+        `).join('')}
       </div>
     </section>
   `).join('');
@@ -287,20 +318,31 @@ function renderMaterials() {
     return;
   }
 
-  holder.innerHTML = state.materials.map(item => `
-    <section class="item-card">
-      <div class="item-top">
-        <div>
-          <div class="item-title">${escapeHtml(item.name)}</div>
-          <div class="item-sub">${escapeHtml(item.category || '-')} · ${escapeHtml(item.location || '-')}</div>
-        </div>
-        <span class="badge ${item.status}">${materialStatusText(item.status)}</span>
-      </div>
-      ${item.spec ? `<div class="item-sub">${escapeHtml(item.spec)}</div>` : ''}
-      <div class="item-sub">庫存：${escapeHtml(String(item.qty))} ${escapeHtml(item.unit)} ｜ 安全庫存：${escapeHtml(String(item.safeQty))}</div>
-      <div class="item-sub">補料狀態：${escapeHtml(item.restockStatus || '未設定')}</div>
-      <div class="action-row">
-        <button class="btn btn-primary" type="button" onclick='openIssueMaterial(${jsonAttr(item)})' ${item.qty <= 0 ? 'disabled' : ''}>領用</button>
+  const groups = groupByLocation(state.materials);
+
+  holder.innerHTML = groups.map(group => `
+    <section class="section-card">
+      <div class="section-title">📍 儲位：${escapeHtml(group.location)}</div>
+      <div class="list-stack">
+        ${group.items.map(item => `
+          <section class="item-card">
+            <div class="item-top">
+              <div>
+                <div class="item-title">${escapeHtml(item.name)}</div>
+                <div class="item-sub">類別：${escapeHtml(item.category || '-')}</div>
+                <div class="location-chip">儲位：${escapeHtml(item.location || '-')}</div>
+              </div>
+              <span class="badge ${item.status}">${materialStatusText(item.status)}</span>
+            </div>
+            ${item.spec ? `<div class="item-sub">規格：${escapeHtml(item.spec)}</div>` : ''}
+            <div class="item-sub">庫存：${escapeHtml(String(item.qty))} ${escapeHtml(item.unit)} ｜ 安全庫存：${escapeHtml(String(item.safeQty))}</div>
+            <div class="item-sub">補料狀態：${escapeHtml(item.restockStatus || '未設定')}</div>
+            <div class="item-sub">是否控管庫存：${escapeHtml(item.controlFlag || '是')}</div>
+            <div class="action-row">
+              <button class="btn btn-primary" type="button" onclick='openIssueMaterial(${jsonAttr(item)})' ${item.qty <= 0 ? 'disabled' : ''}>領用</button>
+            </div>
+          </section>
+        `).join('')}
       </div>
     </section>
   `).join('');
@@ -314,7 +356,13 @@ function renderVehicles() {
     return;
   }
 
-  holder.innerHTML = state.vehicles.map(item => {
+  const vehicles = [...state.vehicles].sort((a, b) => {
+    const pa = (a.plateNo || '').localeCompare(b.plateNo || '', 'zh-Hant');
+    if (pa !== 0) return pa;
+    return (a.name || '').localeCompare(b.name || '', 'zh-Hant');
+  });
+
+  holder.innerHTML = vehicles.map(item => {
     const active = item.activeReservation;
     const badgeClass = item.currentStatus === 'disabled'
       ? 'disabled'
@@ -332,7 +380,9 @@ function renderVehicles() {
         <div class="item-top">
           <div>
             <div class="item-title">${escapeHtml(item.name)}</div>
-            <div class="item-sub">${escapeHtml(item.plateNo)} · ${escapeHtml(item.type)} · ${escapeHtml(item.location || '-')}</div>
+            <div class="item-sub">車牌：${escapeHtml(item.plateNo)}</div>
+            <div class="item-sub">車種：${escapeHtml(item.type)}</div>
+            <div class="location-chip">停放位置：${escapeHtml(item.location || '-')}</div>
           </div>
           <span class="badge ${badgeClass}">${badgeText}</span>
         </div>
@@ -438,19 +488,30 @@ function renderAdminMaterialStock() {
     return;
   }
 
-  holder.innerHTML = state.materials.map(item => `
-    <section class="item-card">
-      <div class="item-top">
-        <div>
-          <div class="item-title">${escapeHtml(item.name)}</div>
-          <div class="item-sub">${escapeHtml(item.category || '-')} · ${escapeHtml(item.location || '-')}</div>
-        </div>
-        <span class="badge ${item.status}">${materialStatusText(item.status)}</span>
-      </div>
-      <div class="item-sub">目前庫存：${escapeHtml(String(item.qty))} ${escapeHtml(item.unit)} ｜ 安全庫存：${escapeHtml(String(item.safeQty))}</div>
-      <div class="item-sub">補料狀態：${escapeHtml(item.restockStatus || '-')}</div>
-      <div class="action-row">
-        <button class="btn btn-secondary" type="button" onclick='openEditMaterialStock(${jsonAttr(item)})'>調整</button>
+  const groups = groupByLocation(state.materials);
+
+  holder.innerHTML = groups.map(group => `
+    <section class="section-card">
+      <div class="section-title">📍 儲位：${escapeHtml(group.location)}</div>
+      <div class="list-stack">
+        ${group.items.map(item => `
+          <section class="item-card">
+            <div class="item-top">
+              <div>
+                <div class="item-title">${escapeHtml(item.name)}</div>
+                <div class="item-sub">類別：${escapeHtml(item.category || '-')}</div>
+                <div class="location-chip">儲位：${escapeHtml(item.location || '-')}</div>
+              </div>
+              <span class="badge ${item.status}">${materialStatusText(item.status)}</span>
+            </div>
+            <div class="item-sub">目前庫存：${escapeHtml(String(item.qty))} ${escapeHtml(item.unit)} ｜ 安全庫存：${escapeHtml(String(item.safeQty))}</div>
+            <div class="item-sub">補料狀態：${escapeHtml(item.restockStatus || '-')}</div>
+            <div class="item-sub">是否控管庫存：${escapeHtml(item.controlFlag || '是')}</div>
+            <div class="action-row">
+              <button class="btn btn-secondary" type="button" onclick='openEditMaterialStock(${jsonAttr(item)})'>調整</button>
+            </div>
+          </section>
+        `).join('')}
       </div>
     </section>
   `).join('');
@@ -718,6 +779,13 @@ function openEditMaterialStock(item) {
       <input id="editMatSafeQty" class="input" type="number" min="0" step="1" value="${item.safeQty}">
     </div>
     <div class="field">
+      <div class="label">是否控管庫存</div>
+      <select id="editMatControlFlag" class="select">
+        <option value="是" ${item.controlFlag === '是' ? 'selected' : ''}>是</option>
+        <option value="否" ${item.controlFlag === '否' ? 'selected' : ''}>否</option>
+      </select>
+    </div>
+    <div class="field">
       <div class="label">補料狀態</div>
       <select id="editMatRestockStatus" class="select">
         <option value="未補" ${item.restockStatus === '未補' ? 'selected' : ''}>未補</option>
@@ -740,6 +808,7 @@ function openEditMaterialStock(item) {
         rowNumber: item.rowNumber,
         qty: Number($('#editMatQty').value),
         safeQty: Number($('#editMatSafeQty').value),
+        controlFlag: $('#editMatControlFlag').value,
         restockStatus: $('#editMatRestockStatus').value,
         note: $('#editMatNote').value.trim()
       });
