@@ -58,7 +58,7 @@
             </div>
             <div class="card-metrics">
               <div><strong id="vhAvailable">0</strong><span>可用車輛</span></div>
-              <div><strong id="vhReserved">0</strong><span>今日預約</span></div>
+              <div><strong id="vhReserved">0</strong><span>今日借用中</span></div>
             </div>
             <div class="card-link">進入功能</div>
           </button>
@@ -69,7 +69,7 @@
           <div class="notice-list">
             <div class="notice-item">機具借用需填寫借用人與預計歸還日。</div>
             <div class="notice-item">材料依數量與安全庫存自動判斷正常、低庫存、缺料。</div>
-            <div class="notice-item">車輛預約若時段重疊，系統會自動阻擋。</div>
+            <div class="notice-item">車輛若今天落在借用區間內，將顯示借用中且不可預約。</div>
           </div>
         </section>
       </section>
@@ -95,7 +95,6 @@
 
       <section id="vehiclesView" class="view">
         <div class="tools">
-          <input id="vehicleDate" class="input" type="date">
           <input id="vehicleSearch" class="input" placeholder="搜尋車輛名稱／車牌／車種">
         </div>
         <div id="vehicleList" class="list-stack"></div>
@@ -146,7 +145,7 @@
         <div id="adminVehicleLogsTab" class="admin-tab">
           <section class="section-card">
             <div class="section-title">🚗 車輛調度紀錄</div>
-            <input id="adminVehicleLogSearch" class="input" placeholder="搜尋申請人／駕駛人／車牌／用途">
+            <input id="adminVehicleLogSearch" class="input" placeholder="搜尋申請人／駕駛人／車名／用途">
             <div id="adminVehicleLogs" class="list-stack"></div>
           </section>
         </div>
