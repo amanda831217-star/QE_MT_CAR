@@ -35,7 +35,6 @@ function bindEvents() {
   $('#equipmentSearch').addEventListener('input', debounce(loadEquipment, 250));
   $('#materialSearch').addEventListener('input', debounce(loadMaterials, 250));
   $('#vehicleSearch').addEventListener('input', debounce(loadVehicles, 250));
-  $('#vehicleDate').addEventListener('change', loadVehicles);
 
   $$('.chip[data-eq-status]').forEach(chip => {
     chip.addEventListener('click', async () => {
@@ -92,7 +91,6 @@ function setToday() {
     day: '2-digit',
     weekday: 'short'
   });
-  $('#vehicleDate').value = now.toISOString().slice(0, 10);
 }
 
 function showView(name) {
@@ -166,12 +164,12 @@ async function loadHome() {
   await withLoading(async () => {
     const data = await api('getDashboard');
 
-    $('#eqAvailable').textContent = data.summary.equipmentAvailable;
-    $('#eqBorrowed').textContent = data.summary.equipmentBorrowed;
-    $('#matLow').textContent = data.summary.materialsLow;
-    $('#matOut').textContent = data.summary.materialsOut;
-    $('#vhAvailable').textContent = data.summary.vehiclesAvailable;
-    $('#vhReserved').textContent = data.summary.vehiclesReservedToday;
+    $('#eqAvailable').textContent = data.summary.equipmentAvailable ?? 0;
+    $('#eqBorrowed').textContent = data.summary.equipmentBorrowed ?? 0;
+    $('#matLow').textContent = data.summary.materialsLow ?? 0;
+    $('#matOut').textContent = data.summary.materialsOut ?? 0;
+    $('#vhAvailable').textContent = data.summary.vehiclesAvailable ?? 0;
+    $('#vhReserved').textContent = data.summary.vehiclesReservedToday ?? 0;
   });
 }
 
@@ -197,8 +195,7 @@ async function loadMaterials() {
 async function loadVehicles() {
   await withLoading(async () => {
     state.vehicles = await api('listVehicles', {
-      keyword: $('#vehicleSearch').value.trim(),
-      date: $('#vehicleDate').value
+      keyword: $('#vehicleSearch').value.trim()
     });
     renderVehicles();
   });
@@ -215,6 +212,7 @@ function showAdminTab(tab) {
 
 async function loadAdminTab(tab) {
   if (tab === 'vehicles') return;
+
   if (tab === 'vehicleLogs') {
     await withLoading(async () => {
       state.vehicleLogs = await api('listVehicleLogs', {
@@ -223,6 +221,7 @@ async function loadAdminTab(tab) {
       renderAdminVehicleLogs();
     });
   }
+
   if (tab === 'equipmentLogs') {
     await withLoading(async () => {
       state.equipmentLogs = await api('listEquipmentLogs', {
@@ -231,6 +230,7 @@ async function loadAdminTab(tab) {
       renderAdminEquipmentLogs();
     });
   }
+
   if (tab === 'materialLogs') {
     await withLoading(async () => {
       state.materialLogs = await api('listMaterialLogs', {
@@ -239,6 +239,7 @@ async function loadAdminTab(tab) {
       renderAdminMaterialLogs();
     });
   }
+
   if (tab === 'materialStock') {
     await withLoading(async () => {
       state.materials = await api('listMaterials', {
@@ -251,6 +252,7 @@ async function loadAdminTab(tab) {
 
 function renderEquipment() {
   const holder = $('#equipmentList');
+
   if (!state.equipment.length) {
     holder.innerHTML = `<div class="empty">查無資料</div>`;
     return;
@@ -279,6 +281,7 @@ function renderEquipment() {
 
 function renderMaterials() {
   const holder = $('#materialList');
+
   if (!state.materials.length) {
     holder.innerHTML = `<div class="empty">查無資料</div>`;
     return;
@@ -305,42 +308,55 @@ function renderMaterials() {
 
 function renderVehicles() {
   const holder = $('#vehicleList');
+
   if (!state.vehicles.length) {
     holder.innerHTML = `<div class="empty">查無資料</div>`;
     return;
   }
 
-  holder.innerHTML = state.vehicles.map(item => `
-    <section class="item-card">
-      <div class="item-top">
-        <div>
-          <div class="item-title">${escapeHtml(item.name)}</div>
-          <div class="item-sub">${escapeHtml(item.plateNo)} · ${escapeHtml(item.type)} · ${escapeHtml(item.location || '-')}</div>
+  holder.innerHTML = state.vehicles.map(item => {
+    const active = item.activeReservation;
+    const badgeClass = item.currentStatus === 'disabled'
+      ? 'disabled'
+      : item.currentStatus === 'borrowed'
+        ? 'borrowed'
+        : 'available';
+    const badgeText = item.currentStatus === 'disabled'
+      ? '停用'
+      : item.currentStatus === 'borrowed'
+        ? '借用中'
+        : '可使用';
+
+    return `
+      <section class="item-card">
+        <div class="item-top">
+          <div>
+            <div class="item-title">${escapeHtml(item.name)}</div>
+            <div class="item-sub">${escapeHtml(item.plateNo)} · ${escapeHtml(item.type)} · ${escapeHtml(item.location || '-')}</div>
+          </div>
+          <span class="badge ${badgeClass}">${badgeText}</span>
         </div>
-        <span class="badge ${item.status === '停用' ? 'disabled' : (item.reservations.length ? 'partial' : 'available')}">
-          ${item.status === '停用' ? '停用' : (item.reservations.length ? '已預約' : '可使用')}
-        </span>
-      </div>
-      <div class="list-stack">
-        ${item.reservations.length
-          ? item.reservations.map(r => `
-            <div class="mini-card">
-              ${escapeHtml(r.startAt)} → ${escapeHtml(r.endAt)}
-              <div class="small">申請人：${escapeHtml(r.applicant)} ｜ 駕駛人：${escapeHtml(r.driver)}</div>
-              <div class="small">用途：${escapeHtml(r.purpose)} ｜ 目的地：${escapeHtml(r.destination)}</div>
-            </div>
-          `).join('')
-          : `<div class="mini-card">目前無預約</div>`}
-      </div>
-      <div class="action-row">
-        <button class="btn btn-primary" type="button" onclick='openReserveVehicle(${jsonAttr(item)})' ${item.status === '停用' ? 'disabled' : ''}>預約</button>
-      </div>
-    </section>
-  `).join('');
+
+        ${active ? `
+          <div class="item-sub">申請人：${escapeHtml(active.applicant)}</div>
+          <div class="item-sub">駕駛人：${escapeHtml(active.driver)}</div>
+          <div class="item-sub">期間：${escapeHtml(active.startAt)} → ${escapeHtml(active.endAt)}</div>
+          <div class="item-sub">用途：${escapeHtml(active.purpose || '-')} ｜ 目的地：${escapeHtml(active.destination || '-')}</div>
+        ` : `
+          <div class="item-sub">目前無有效借用，可預約。</div>
+        `}
+
+        <div class="action-row">
+          <button class="btn btn-primary" type="button" onclick='openReserveVehicle(${jsonAttr(item)})' ${item.currentStatus !== 'available' ? 'disabled' : ''}>預約</button>
+        </div>
+      </section>
+    `;
+  }).join('');
 }
 
 function renderAdminVehicleLogs() {
   const holder = $('#adminVehicleLogs');
+
   if (!state.vehicleLogs.length) {
     holder.innerHTML = `<div class="empty">查無紀錄</div>`;
     return;
@@ -368,6 +384,7 @@ function renderAdminVehicleLogs() {
 
 function renderAdminEquipmentLogs() {
   const holder = $('#adminEquipmentLogs');
+
   if (!state.equipmentLogs.length) {
     holder.innerHTML = `<div class="empty">查無紀錄</div>`;
     return;
@@ -391,6 +408,7 @@ function renderAdminEquipmentLogs() {
 
 function renderAdminMaterialLogs() {
   const holder = $('#adminMaterialLogs');
+
   if (!state.materialLogs.length) {
     holder.innerHTML = `<div class="empty">查無紀錄</div>`;
     return;
@@ -414,6 +432,7 @@ function renderAdminMaterialLogs() {
 
 function renderAdminMaterialStock() {
   const holder = $('#adminMaterialStockList');
+
   if (!state.materials.length) {
     holder.innerHTML = `<div class="empty">查無資料</div>`;
     return;
@@ -540,14 +559,14 @@ function openIssueMaterial(item) {
       closeModal();
       await loadMaterials();
       await loadHome();
-      if (state.currentView === 'admin' && state.adminTab === 'materialStock') await loadAdminTab('materialStock');
+      if (state.currentView === 'admin' && state.adminTab === 'materialStock') {
+        await loadAdminTab('materialStock');
+      }
     });
   });
 }
 
 function openReserveVehicle(item) {
-  const date = $('#vehicleDate').value || new Date().toISOString().slice(0, 10);
-
   openModal(`預約 · ${item.name}`, `
     <div class="field">
       <div class="label">申請人</div>
@@ -567,11 +586,11 @@ function openReserveVehicle(item) {
     </div>
     <div class="field">
       <div class="label">開始時間</div>
-      <input id="vhStart" class="input" type="datetime-local" value="${date}T08:00">
+      <input id="vhStart" class="input" type="datetime-local">
     </div>
     <div class="field">
       <div class="label">結束時間</div>
-      <input id="vhEnd" class="input" type="datetime-local" value="${date}T17:00">
+      <input id="vhEnd" class="input" type="datetime-local">
     </div>
     <div class="field">
       <div class="label">備註</div>
@@ -581,6 +600,12 @@ function openReserveVehicle(item) {
       <button id="vhReserveConfirm" class="btn btn-primary" type="button">確認預約</button>
     </div>
   `);
+
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 0);
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 17, 0);
+  $('#vhStart').value = toDatetimeLocal(start);
+  $('#vhEnd').value = toDatetimeLocal(end);
 
   $('#vhReserveConfirm').addEventListener('click', async e => {
     await submitButton(e.currentTarget, async () => {
@@ -598,7 +623,9 @@ function openReserveVehicle(item) {
       closeModal();
       await loadVehicles();
       await loadHome();
-      if (state.currentView === 'admin' && state.adminTab === 'vehicleLogs') await loadAdminTab('vehicleLogs');
+      if (state.currentView === 'admin' && state.adminTab === 'vehicleLogs') {
+        await loadAdminTab('vehicleLogs');
+      }
     });
   });
 }
@@ -607,19 +634,19 @@ function openEditVehicleReservation(item) {
   openModal(`修改預約 · ${item.vehicleName || item.vehicleId}`, `
     <div class="field">
       <div class="label">申請人</div>
-      <input id="editVhApplicant" class="input" value="${escapeHtml(item.applicant)}">
+      <input id="editVhApplicant" class="input" value="${escapeAttr(item.applicant)}">
     </div>
     <div class="field">
       <div class="label">駕駛人</div>
-      <input id="editVhDriver" class="input" value="${escapeHtml(item.driver)}">
+      <input id="editVhDriver" class="input" value="${escapeAttr(item.driver)}">
     </div>
     <div class="field">
       <div class="label">用途</div>
-      <input id="editVhPurpose" class="input" value="${escapeHtml(item.purpose)}">
+      <input id="editVhPurpose" class="input" value="${escapeAttr(item.purpose)}">
     </div>
     <div class="field">
       <div class="label">目的地</div>
-      <input id="editVhDestination" class="input" value="${escapeHtml(item.destination)}">
+      <input id="editVhDestination" class="input" value="${escapeAttr(item.destination)}">
     </div>
     <div class="field">
       <div class="label">開始時間</div>
@@ -670,6 +697,7 @@ function openEditVehicleReservation(item) {
 
 async function cancelVehicleReservation(rowNumber) {
   if (!confirm('確定要取消這筆預約嗎？')) return;
+
   await withLoading(async () => {
     await api('cancelVehicleReservation', { rowNumber });
     toast('已取消預約');
@@ -743,6 +771,11 @@ function clearAddVehicleForm() {
   $('#addVehicleNote').value = '';
 }
 
+function toDatetimeLocal(d) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 async function submitButton(btn, fn) {
   const originalText = btn.textContent;
   btn.disabled = true;
@@ -804,6 +837,10 @@ function escapeHtml(v) {
     '"':'&quot;',
     "'":'&#39;'
   })[s]);
+}
+
+function escapeAttr(v) {
+  return String(v ?? '').replace(/"/g, '&quot;');
 }
 
 function jsonAttr(obj) {
