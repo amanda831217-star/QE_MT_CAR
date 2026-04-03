@@ -1,5 +1,5 @@
 const CONFIG = {
-  apiUrl: 'PASTE_YOUR_GAS_WEB_APP_URL_HERE',
+  apiUrl: 'AKfycbxZ2iWHqHK5gbcauR7PvXnn11cLijpCtYLXS3Fl5gYF93-TiWZlM2jjibN_oIxbutf6Ug',
   userId: 'U001'
 };
 
